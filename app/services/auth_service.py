@@ -1,22 +1,32 @@
 from app.models.user import User
 from app.schemas import user
 from app.schemas.user import UserCreate
-from app.core.security import hash_password, verify_password, create_access_token, decode_access_token
+from app.core.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    decode_access_token,
+    create_refresh_token,
+    create_csrf_token,
+)
 from app.repositories.user_repository import (
     get_user_by_id,
     get_user_by_email,
+    get_user_by_username,
     create_user,
 )
+from app.repositories.auth_repository import create_user_session
+from app.schemas.auth import UserSessionCreate
 
 
-def signup_user(db, user: UserCreate):
+async def signup_user(db, user: UserCreate):
     # Validate email uniqueness
-    existing_user = db.query(User).filter(User.email == user.email).first()
+    existing_user = await get_user_by_email(db, user.email)
     if existing_user:
         raise ValueError("Email already registered")
 
     # Validate username uniqueness
-    existing_user = db.query(User).filter(User.username == user.username).first()
+    existing_user = await get_user_by_username(db, user.username)
     if existing_user:
         raise ValueError("Username already taken")
 
@@ -40,16 +50,12 @@ def login_user(db, email: str, password: str):
     # Verify the password
     if not verify_password(password, user.hashed_password):
         raise ValueError("Invalid email or password")
-    
+
     # Create an access token for the user
     access_token = create_access_token(user.id)
     user.access_token = access_token
-    
+
     # Create a user session in the database
-    from app.repositories.auth_repository import create_user_session
-    from app.schemas.auth import UserSessionCreate
-    user_session_data = UserSessionCreate(user_id=user.id, session_id=access_token)
-    create_user_session(db, user_session_data)
 
     return user
 
@@ -65,16 +71,16 @@ def verify_password(plain_password, hashed_password):
 def refresh_user_session(db, user_id: str):
     # Logic to refresh the user session
     user = get_user_by_id(db, user_id)
-    
+
     if not user:
-            raise ValueError("User not found")
+        raise ValueError("User not found")
 
     decode_token = decode_access_token(user.access_token)
-    
+
     if decode_token and decode_token.get("sub") == user_id:
         # Token is still valid, no need to refresh
         return user.access_token
-    
+
     # Token is expired or invalid, generate a new one
     new_access_token = create_access_token(user_id)
     user.access_token = new_access_token
@@ -82,3 +88,22 @@ def refresh_user_session(db, user_id: str):
     db.refresh(user)
     return new_access_token
 
+
+async def login_process(db, user):
+    access_token = await create_access_token(user)
+    refresh_token = await create_refresh_token(user)
+    csrf_token = await create_csrf_token(user)
+
+    create_user_session = UserSessionCreate(
+        user_id=user.id,
+        session_id=access_token,
+        refresh_token=refresh_token,
+        csrf_token=csrf_token,
+    )
+    create_user_session(db, create_user_session)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "csrf_token": csrf_token,
+    }

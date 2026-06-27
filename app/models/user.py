@@ -1,10 +1,20 @@
-from sqlalchemy import Column, DateTime, Integer, String, Boolean, UUID, ENUM, ForeignKey
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Boolean,
+    UUID,
+    Enum,
+    ForeignKey,
+)
 from datetime import datetime
+from app.core.database import Base
 
 from sqlalchemy.orm import relationship
 
 
-class Users():
+class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID, primary_key=True, index=True)
@@ -14,10 +24,9 @@ class Users():
     last_name = Column(String, nullable=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
-    role = Column(String, ENUM("user", "admin", name="user_roles"), default="user")
+    role = Column(String, Enum("user", "admin", name="user_roles"), default="user")
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(UUID, ForeignKey("users.id"), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = Column(UUID, ForeignKey("users.id"), nullable=True)
-

@@ -1,16 +1,17 @@
+import token
+
 import jwt
 from datetime import datetime, timedelta
 from app.core.config import settings
+import bcrypt
 
 
-def hash_password(password: str) -> str:
-    import bcrypt
-
+async def hash_password(password: str) -> str:
     hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
     return hashed.decode("utf-8")
 
 
-def encode_access_token(user: dict) -> str:
+async def create_access_token(user: dict) -> str:
     payload = {
         "sub": user["id"],
         "user_details": {
@@ -34,7 +35,19 @@ def encode_access_token(user: dict) -> str:
     return token
 
 
-def decode_access_token(token: str) -> dict:
+async def create_refresh_token(user: dict) -> str:
+    payload = {
+        "sub": user["id"],
+        "exp": datetime.utcnow()
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        "type": "refresh",
+    }
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+    return token
+
+
+async def decode_access_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         return payload
@@ -42,3 +55,20 @@ def decode_access_token(token: str) -> dict:
         raise ValueError("Token has expired")
     except jwt.InvalidTokenError:
         raise ValueError("Invalid token")
+
+
+async def verify_password(plain_password, hashed_password):
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+    )
+
+
+async def create_csrf_token(user: dict) -> str:
+    payload = {
+        "sub": user["id"],
+        "session_id": user["session_id"],
+        "exp": datetime.utcnow() + timedelta(minutes=30),
+    }
+    
+    csrf_token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+    return csrf_token

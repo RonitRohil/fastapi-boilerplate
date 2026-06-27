@@ -1,24 +1,34 @@
 from app.models.user import User
-from app.schemas.user import UserCreate, UserUpdate, UserSelfUpdate, UserResponse, UserListResponse
+from app.schemas.user import (
+    UserCreate,
+    UserUpdate,
+    UserSelfUpdate,
+    UserResponse,
+    UserListResponse,
+)
 
 
-def get_user_by_id(db, user_id: str):
+async def get_user_by_id(db, user_id: str):
     return db.query(User).filter(User.id == user_id).first()
 
 
-def get_user_by_email(db, email: str):
+async def get_user_by_username(db, username: str):
+    return db.query(User).filter(User.username == username).first()
+
+
+async def get_user_by_email(db, email: str):
     return db.query(User).filter(User.email == email).first()
 
 
-def create_user(db, user: UserCreate):
+async def create_user(db, user: UserCreate):
     db_user = User(**user.dict())
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
 
-def update_user(db, user_id: str, user: UserUpdate):
-    db_user = get_user_by_id(db, user_id)
+async def update_user(db, user_id: str, user: UserUpdate):
+    db_user = await get_user_by_id(db, user_id)
     if db_user:
         for key, value in user.dict(exclude_unset=True).items():
             setattr(db_user, key, value)
@@ -27,8 +37,8 @@ def update_user(db, user_id: str, user: UserUpdate):
     return db_user
 
 
-def inactivate_user(db, user_id: str):
-    db_user = get_user_by_id(db, user_id)
+async def inactivate_user(db, user_id: str):
+    db_user = await get_user_by_id(db, user_id)
     if db_user:
         db_user.is_active = False
         db.commit()
@@ -36,8 +46,8 @@ def inactivate_user(db, user_id: str):
     return db_user
 
 
-def activate_user(db, user_id: str):
-    db_user = get_user_by_id(db, user_id)
+async def activate_user(db, user_id: str):
+    db_user = await get_user_by_id(db, user_id)
     if db_user:
         db_user.is_active = True
         db.commit()
@@ -45,8 +55,8 @@ def activate_user(db, user_id: str):
     return db_user
 
 
-def delete_user(db, user_id: str):
-    db_user = get_user_by_id(db, user_id)
+async def delete_user(db, user_id: str):
+    db_user = await get_user_by_id(db, user_id)
     if db_user:
         db.delete(db_user)
         db.commit()
@@ -54,7 +64,7 @@ def delete_user(db, user_id: str):
     return None
 
 
-def get_users(
+async def get_users(
     db,
     skip: int = 0,
     limit: int = 100,
@@ -72,5 +82,5 @@ def get_users(
     return query.offset(skip).limit(limit).all()
 
 
-def get_users_count(db):
+async def get_users_count(db):
     return db.query(User).count()

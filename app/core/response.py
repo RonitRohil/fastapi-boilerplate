@@ -1,6 +1,6 @@
 from typing import Any, Optional
 from fastapi.responses import JSONResponse
-from app.schemas.reponse import APIResponse
+from app.schemas.response import APIResponse
 
 
 def api_response(

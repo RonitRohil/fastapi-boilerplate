@@ -136,14 +136,14 @@ async def logout_user(db, user_id: str):
 async def reset_password(db, request):
     # Logic to reset the user password
     user = get_user_by_email(db, request.email)
-    
+
     if not user:
         raise ValueError("User not found")
-    
+
     hashed_password = hash_password(request.new_password)
     user.hashed_password = hashed_password
-    
+
     db.commit()
     db.refresh(user)
-    
+
     return user

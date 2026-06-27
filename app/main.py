@@ -1,11 +1,16 @@
-import fastapi
-from app.routers import users, auth
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from app.core.exceptions import http_exception_handler, validation_exception_handler
+from app.routers import users_router, auth_router
 
-app = fastapi.FastAPI()
+app = FastAPI()
 
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
-app.include_router(users.router, prefix="/users", tags=["users"])
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(users_router.router)
+app.include_router(auth_router.router)
 
 
 @app.get("/")

@@ -19,14 +19,14 @@ async def create_user_service(db, user: UserCreate):
     existing_user = await get_user_by_email(db, user.email)
     if existing_user:
         raise ValueError("Email already registered")
-    
+
     existing_user = await get_user_by_username(db, user.username)
     if existing_user:
         raise ValueError("Username already taken")
-    
+
     hashed_password = hash_password(user.password)
     user.password = hashed_password
-    
+
     return await create_user(db, user)
 
 
@@ -34,16 +34,42 @@ async def update_user_service(db, user_id: str, user):
     existing_user = await get_user_by_id(db, user_id)
     if not existing_user:
         raise ValueError("User not found")
-    
+
     if user.email and user.email != existing_user.email:
         if await get_user_by_email(db, user.email):
             raise ValueError("Email already registered")
-        
+
     if user.username and user.username != existing_user.username:
         if await get_user_by_username(db, user.username):
             raise ValueError("Username already taken")
-        
+
     return await update_user(db, user_id, user)
 
 
+async def get_user_service(db, user_id: str):
+    return await get_user_by_id(db, user_id)
 
+
+async def get_users_list_service(db, page: int, page_size: int):
+    users = await get_users(db, page, page_size)
+    total = await get_users_count(db)
+    return {"users": users, "total": total, "page": page, "page_size": page_size}
+
+
+async def update_user_status_service(db, user_id: str):
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    if user.is_active:
+        return await inactivate_user(db, user_id)
+
+    return await activate_user(db, user_id)
+
+
+async def delete_user_service(db, user_id: str):
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    return await delete_user(db, user_id)

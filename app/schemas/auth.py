@@ -68,3 +68,20 @@ class ResetPasswordRequest(BaseModel):
 
 class ResetPasswordResponse(BaseModel):
     message: str = "Successfully reset password"
+
+
+class AddUserToken(BaseModel):
+    jti: str
+    user_id: str
+    session_id: str
+    token_type: str
+    expires_at: str
+
+
+class AddUserTokenResponse(BaseModel):
+    jti: str
+    user_id: str
+    session_id: str
+    token_type: str
+    expires_at: str
+    revoked_at: str

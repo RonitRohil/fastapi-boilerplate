@@ -15,7 +15,7 @@ from app.repositories.user_repository import (
     get_user_by_username,
     create_user,
 )
-from app.repositories.auth_repository import create_user_session
+from app.repositories.auth_repository import create_user_session, revoke_user_session
 from app.schemas.auth import UserSessionCreate
 
 
@@ -42,13 +42,14 @@ async def signup_user(db, user: UserCreate):
     return db_user
 
 
-def login_user(db, email: str, password: str):
+async def login_user(db, email: str, password: str):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise ValueError("Invalid email or password")
 
     # Verify the password
-    if not verify_password(password, user.hashed_password):
+    verify_pass = await verify_password(password, user.hashed_password)
+    if verify_pass == False:
         raise ValueError("Invalid email or password")
 
     # Create an access token for the user
@@ -107,3 +108,14 @@ async def login_process(db, user):
         "refresh_token": refresh_token,
         "csrf_token": csrf_token,
     }
+
+
+async def logout_user(db, user_id: str):
+    # Logic to logout the user
+    user = get_user_by_id(db, user_id)
+
+    if not user:
+        raise ValueError("User not found")
+
+    revoke_session = await revoke_user_session(db, user_id)
+    return revoke_session

@@ -21,10 +21,20 @@ async def get_user_by_email(db, email: str):
 
 
 async def create_user(db, user: UserCreate):
-    db_user = User(**user.dict())
+    db_user = User(
+        username=user.username,
+        email=user.email,
+        hashed_password=user.password,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        role=user.role,  # user created by admin can be admin also.
+        is_active=True,
+    )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    return db_user
 
 
 async def update_user(db, user_id: str, user: UserUpdate):

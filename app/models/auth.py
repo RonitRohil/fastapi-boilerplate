@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -9,7 +9,7 @@ class UserSession(Base):
     __tablename__ = "user_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     session_id = Column(String, unique=True, index=True)
     device_name = Column(String(200), nullable=True)
     user_agent = Column(Text, nullable=True)
@@ -26,7 +26,7 @@ class UserToken(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     jti = Column(String(36), unique=True, index=True, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     session_id = Column(
         String(36), ForeignKey("user_sessions.session_id"), nullable=False, index=True
     )

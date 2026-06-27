@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.dependencies import get_db, get_current_user
-from app.schemas.user import UserResponse, UserCreate, UserUpdate
+from app.schemas.user import UserResponse, UserCreate, UserUpdate, UserListResponse
 from app.services.user_service import (
     create_user_service,
     update_user_service,
@@ -9,7 +9,7 @@ from app.services.user_service import (
     update_user_status_service,
     delete_user_service,
 )
-from app.core.reponse import api_response
+from app.core.response import api_response
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -27,37 +27,58 @@ async def create_user_route(
             result=result,
         )
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+
     except Exception as e:
         return {"error": "An unexpected error occurred: " + str(e)}
 
 
 @router.put("/update/{user_id}", response_model=UserResponse)
-async def update_user_route(db, user_id: str, user):
+async def update_user_route(
+    user: UserUpdate,
+    user_id: str,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     try:
-        return await update_user_service(db, user_id, user)
+        return await update_user_service(db, user_id, user, current_user)
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+
     except Exception as e:
         return {"error": "An unexpected error occurred: " + str(e)}
 
 
 @router.get("/get/{user_id}", response_model=UserResponse)
-async def get_user_route(db, user_id: str):
+async def get_user_by_id_route(db=Depends(get_db), user_id: str = None):
     try:
-        return await get_user_service(db, user_id)
+        user = await get_user_service(db, user_id)
+        return api_response(
+            success=1,
+            status_code=200,
+            message="User details fetched successfully",
+            result=user,
+        )
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+
     except Exception as e:
         return {"error": "An unexpected error occurred: " + str(e)}
 
 
-@router.get("/get/list", response_model=UserResponse)
+@router.get("/get/list", response_model=UserListResponse)
 async def get_users_list_route(db, page: int = 1, page_size: int = 10):
     try:
-        return await get_users_list_service(db, page, page_size)
+        users_list = await get_users_list_service(db, page, page_size)
+        return api_response(
+            success=1,
+            status_code=200,
+            message="Users fetched successfully",
+            result=users_list,
+        )
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
+
     except Exception as e:
         return {"error": "An unexpected error occurred: " + str(e)}
 
@@ -65,14 +86,27 @@ async def get_users_list_route(db, page: int = 1, page_size: int = 10):
 @router.delete("/delete/{user_id}", response_model=UserResponse)
 async def delete_user_route(db, user_id: str):
     try:
-        return await delete_user_service(db, user_id)
+        delete_user = await delete_user_service(db, user_id)
+        return api_response(
+            success=1,
+            status_code=200,
+            message="User deleted successfully",
+            result=delete_user,
+        )
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.put("/{user_id}/udpate/status", response_model=UserResponse, status_code=200)
+@router.put("/{user_id}/update/status", response_model=UserResponse, status_code=200)
 async def user_update_status_route(db, user_id: str):
     try:
-        return await update_user_status_service(db, user_id)
+        update_user_status = await update_user_status_service(db, user_id)
+
+        return api_response(
+            success=1,
+            status_code=200,
+            message="User status updated successfully",
+            result=update_user_status,
+        )
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))

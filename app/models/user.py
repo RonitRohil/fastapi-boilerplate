@@ -10,23 +10,31 @@ from sqlalchemy import (
 )
 from datetime import datetime
 from app.core.database import Base
-
+import uuid
 from sqlalchemy.orm import relationship
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(UUID, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
-    role = Column(String, Enum("user", "admin", name="user_roles"), default="user")
+    role = Column(Enum("user", "admin", name="user_roles"), default="user")
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(UUID, ForeignKey("users.id"), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = Column(UUID, ForeignKey("users.id"), nullable=True)
+
+    sessions = relationship(
+        "UserSession", back_populates="user", foreign_keys="UserSession.user_id"
+    )
+
+    tokens = relationship(
+        "UserToken", back_populates="user", foreign_keys="UserToken.user_id"
+    )

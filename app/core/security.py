@@ -1,3 +1,5 @@
+import uuid
+
 import jwt
 from datetime import datetime, timedelta, timezone
 from app.core.config import settings
@@ -35,6 +37,8 @@ def create_refresh_token(user: dict) -> str:
         "exp": datetime.now(timezone.utc)
         + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         "type": "refresh",
+        "session_id": user["session_id"],
+        "jti": str(uuid.uuid4()),
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -66,3 +70,12 @@ def create_csrf_token(user: dict) -> str:
 
     csrf_token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return csrf_token
+
+
+def create_password_reset_token(user_id: str) -> str:
+    payload = {
+        "sub": str(user_id),
+        "purpose": "password_reset",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

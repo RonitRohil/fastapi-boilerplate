@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.core.dependencies import get_db, get_current_user, require_admin
+from app.core.dependencies import get_db, get_current_user, require_admin, verify_csrf_token
 from app.schemas.user import (
     UserResponse,
     UserCreate,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("/create", response_model=UserResponse, status_code=201)
 async def create_user_route(
-    user: UserCreate, db=Depends(get_db), current_user=Depends(get_current_user)
+    user: UserCreate, db=Depends(get_db), current_user=Depends(require_admin),
 ):
     try:
         result = await create_user_service(db, user, current_user)
@@ -43,11 +43,12 @@ async def create_user_route(
 async def update_user_self(
     user: UserSelfUpdate,
     db=Depends(get_db),
+    _=Depends(verify_csrf_token),
     current_user=Depends(get_current_user),
 ):
     try:
         update_user_response = await update_user_service(
-            db, current_user, user, current_user
+            db, str(current_user.id), user, current_user
         )
 
         return api_response(
@@ -68,6 +69,7 @@ async def update_user_route(
     user: UserUpdate,
     user_id: str,
     db=Depends(get_db),
+    _=Depends(verify_csrf_token),
     current_user=Depends(require_admin),
 ):
     try:
@@ -92,6 +94,7 @@ async def update_user_route(
 @router.get("/get/list", response_model=UserListResponse)
 async def get_users_list_route(
     db=Depends(get_db),
+    current_user=Depends(get_current_user),
     page: int = 1,
     page_size: int = 10,
     role: str | None = None,
@@ -121,7 +124,9 @@ async def get_users_list_route(
 
 
 @router.get("/get/{user_id}", response_model=UserResponse)
-async def get_user_by_id_route(db=Depends(get_db), user_id: str = None):
+async def get_user_by_id_route(
+    db=Depends(get_db), current_user=Depends(get_current_user), user_id: str = None
+):
     try:
         user = await get_user_service(db, user_id)
         return api_response(
@@ -155,7 +160,7 @@ async def delete_user_route(
 
 @router.put("/{user_id}/update/status", response_model=UserResponse, status_code=200)
 async def user_update_status_route(
-    user_id: str, db=Depends(get_db), current_user=Depends(require_admin)
+    user_id: str, db=Depends(get_db),_=Depends(verify_csrf_token), current_user=Depends(require_admin),
 ):
 
     try:

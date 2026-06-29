@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     FIRST_ADMIN_EMAIL: str = "admin@example.com"
     FIRST_ADMIN_PASSWORD: str = "Admin@1234"
+    COOKIE_SECURE: bool = False
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 

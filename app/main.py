@@ -14,8 +14,8 @@ app = FastAPI(
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
-app.include_router(users_router.router)
-app.include_router(auth_router.router)
+app.include_router(users_router.router, prefix=settings.API_V1_PREFIX)
+app.include_router(auth_router.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

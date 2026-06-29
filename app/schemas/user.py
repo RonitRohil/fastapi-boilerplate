@@ -26,7 +26,6 @@ class UserUpdate(BaseModel):
 class UserSelfUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
-    password: str | None = None
 
 
 class UserResponse(BaseModel):

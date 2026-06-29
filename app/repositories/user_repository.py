@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.user import (
     UserCreate,
@@ -59,12 +60,14 @@ def create_user_no_commit(db, user: UserCreate, hashed_password: str) -> User:
     return db_user
 
 
-def update_user(db, user_id: str, user: UserUpdate, current_user):
+def update_user(db, user_id: str, user, current_user):
     db_user = get_user_by_id(db, user_id)
     if db_user:
         for key, value in user.model_dump(exclude_unset=True).items():
-            setattr(db_user, key, value)
-
+            if key == "password":
+                db_user.hashed_password = hash_password(value)  # hash + correct column
+            else:
+                setattr(db_user, key, value)
         db_user.updated_by = current_user.id
         db_user.updated_at = datetime.now(timezone.utc)
 

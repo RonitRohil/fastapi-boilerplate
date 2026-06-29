@@ -34,11 +34,15 @@ async def update_user_service(db, user_id: str, user, current_user):
     if not existing_user:
         raise ValueError("User not found")
 
-    if user.email and user.email != existing_user.email:
+    if hasattr(user, "email") and user.email and user.email != existing_user.email:
         if get_user_by_email(db, user.email):
             raise ValueError("Email already registered")
 
-    if user.username and user.username != existing_user.username:
+    if (
+        hasattr(user, "username")
+        and user.username
+        and user.username != existing_user.username
+    ):
         if get_user_by_username(db, user.username):
             raise ValueError("Username already taken")
 
@@ -56,7 +60,6 @@ async def get_users_list_service(db, page: int, page_size: int, filters):
     is_active = filters.get("is_active")
     is_verified = filters.get("is_verified")
     role = filters.get("role")
-
 
     users = get_users(db, skip, limit, is_active, is_verified, role)
     total = get_users_count(db)

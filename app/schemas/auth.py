@@ -1,6 +1,7 @@
 from datetime import datetime
+from uuid import UUID
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class UserSessionCreate(BaseModel):
@@ -13,7 +14,7 @@ class UserSessionCreate(BaseModel):
 
 
 class UserSessionResponse(BaseModel):
-    id: int
+    id: UUID  # ORM uses UUID(as_uuid=True) — was incorrectly typed as int
     user_id: str
     session_id: str
     device_name: str | None = None
@@ -35,16 +36,6 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-class RefreshTokenRequest(BaseModel):
-    refresh_token: str
-    csrf_token: str
-
-
-class LogoutRequest(BaseModel):
-    refresh_token: str
-    csrf_token: str
-
-
 class LogoutResponse(BaseModel):
     message: str = "Successfully logged out"
 
@@ -55,6 +46,17 @@ class SignupRequest(BaseModel):
     password: str
     first_name: str | None = None
     last_name: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        return v
 
 
 class SignupResponse(BaseModel):
@@ -69,6 +71,17 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
 
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        return v
+
 
 class ResetPasswordResponse(BaseModel):
     message: str = "Successfully reset password"
@@ -77,7 +90,7 @@ class ResetPasswordResponse(BaseModel):
 class AddUserToken(BaseModel):
     jti: str
     user_id: str
-    session_id: str
+    session_id: str | None = None  # nullable — password reset tokens have no session
     token_type: str
     expires_at: datetime
 
@@ -85,7 +98,7 @@ class AddUserToken(BaseModel):
 class AddUserTokenResponse(BaseModel):
     jti: str
     user_id: str
-    session_id: str
+    session_id: str | None = None
     token_type: str
     expires_at: datetime
     revoked_at: datetime

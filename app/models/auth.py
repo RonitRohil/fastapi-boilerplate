@@ -31,9 +31,8 @@ class UserToken(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     jti = Column(String(36), unique=True, index=True, nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    session_id = Column(
-        String(36), ForeignKey("user_sessions.session_id"), nullable=False, index=True
-    )
+    # nullable — no FK so password reset tokens can be stored without a session
+    session_id = Column(String(36), nullable=True, index=True)
     token_type = Column(String(20), nullable=False, default="refresh")
     created_at = Column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

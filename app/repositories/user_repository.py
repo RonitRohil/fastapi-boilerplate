@@ -125,5 +125,17 @@ def get_users(
     return query.offset(skip).limit(limit).all()
 
 
-def get_users_count(db):
-    return db.query(User).count()
+def get_users_count(
+    db,
+    is_active: bool | None = None,
+    is_verified: bool | None = None,
+    role: str | None = None,
+):
+    query = db.query(User)
+    if is_active is not None:
+        query = query.filter(User.is_active == is_active)
+    if is_verified is not None:
+        query = query.filter(User.is_verified == is_verified)
+    if role is not None:
+        query = query.filter(User.role == role)
+    return query.count()

@@ -10,7 +10,6 @@ from app.schemas.user import (
     UserCreate,
     UserSelfUpdate,
     UserUpdate,
-    UserListResponse,
 )
 from app.services.user_service import (
     create_user_service,
@@ -33,7 +32,40 @@ def serialize_users(orm_users: list) -> list:
     return [serialize_user(u) for u in orm_users]
 
 
-@router.post("/create", response_model=UserResponse, status_code=201)
+@router.get("/me")
+async def get_me(current_user=Depends(get_current_user)):
+    return api_response(
+        success=1,
+        status_code=200,
+        message="User profile fetched successfully",
+        result=serialize_user(current_user),
+    )
+
+
+@router.put("/update/me")
+async def update_user_self(
+    user: UserSelfUpdate,
+    db=Depends(get_db),
+    _=Depends(verify_csrf_token),
+    current_user=Depends(get_current_user),
+):
+    try:
+        updated = await update_user_service(
+            db, str(current_user.id), user, current_user
+        )
+        return api_response(
+            success=1,
+            status_code=200,
+            message="User updated successfully",
+            result=serialize_user(updated),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/create", status_code=201)
 async def create_user_route(
     user: UserCreate,
     db=Depends(get_db),
@@ -49,37 +81,11 @@ async def create_user_route(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/update/me", response_model=UserResponse)
-async def update_user_self(
-    user: UserSelfUpdate,
-    db=Depends(get_db),
-    _=Depends(verify_csrf_token),
-    current_user=Depends(get_current_user),
-):
-    try:
-        update_user_response = await update_user_service(
-            db, str(current_user.id), user, current_user
-        )
-
-        return api_response(
-            success=1,
-            status_code=200,
-            message="User updated successfully",
-            result=serialize_user(update_user_response),
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.put("/update/{user_id}", response_model=UserResponse)
+@router.put("/update/{user_id}")
 async def update_user_route(
     user: UserUpdate,
     user_id: str,
@@ -88,25 +94,20 @@ async def update_user_route(
     current_user=Depends(require_admin),
 ):
     try:
-        update_user_response = await update_user_service(
-            db, user_id, user, current_user
-        )
-
+        updated = await update_user_service(db, user_id, user, current_user)
         return api_response(
             success=1,
             status_code=200,
             message="User updated successfully",
-            result=serialize_user(update_user_response),
+            result=serialize_user(updated),
         )
-
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/get/list", response_model=UserListResponse)
+@router.get("/get/list")
 async def get_users_list_route(
     db=Depends(get_db),
     current_user=Depends(get_current_user),
@@ -117,12 +118,7 @@ async def get_users_list_route(
     is_verified: bool | None = None,
 ):
     try:
-        filters = {
-            "role": role,
-            "is_active": is_active,
-            "is_verified": is_verified,
-        }
-
+        filters = {"role": role, "is_active": is_active, "is_verified": is_verified}
         users_list = await get_users_list_service(db, page, page_size, filters)
         users_list["users"] = serialize_users(users_list["users"])
 
@@ -134,14 +130,15 @@ async def get_users_list_route(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/get/{user_id}", response_model=UserResponse)
+@router.get("/get/{user_id}")
 async def get_user_by_id_route(
-    db=Depends(get_db), current_user=Depends(get_current_user), user_id: str = None
+    user_id: str,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     try:
         user = await get_user_service(db, user_id)
@@ -152,44 +149,43 @@ async def get_user_by_id_route(
             result=serialize_user(user),
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/delete/{user_id}", response_model=UserResponse)
+@router.delete("/delete/{user_id}")
 async def delete_user_route(
-    user_id: str, db=Depends(get_db), current_user=Depends(require_admin)
+    user_id: str,
+    db=Depends(get_db),
+    current_user=Depends(require_admin),
 ):
     try:
-        delete_user = await delete_user_service(db, user_id, current_user)
+        deleted = await delete_user_service(db, user_id, current_user)
         return api_response(
             success=1,
             status_code=200,
             message="User deleted successfully",
-            result=serialize_user(delete_user),
+            result=serialize_user(deleted),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.put("/{user_id}/update/status", response_model=UserResponse, status_code=200)
+@router.put("/{user_id}/update/status")
 async def user_update_status_route(
     user_id: str,
     db=Depends(get_db),
     _=Depends(verify_csrf_token),
     current_user=Depends(require_admin),
 ):
-
     try:
-        update_user_status = await update_user_status_service(db, user_id, current_user)
-
+        updated = await update_user_status_service(db, user_id, current_user)
         return api_response(
             success=1,
             status_code=200,
             message="User status updated successfully",
-            result=serialize_user(update_user_status),
+            result=serialize_user(updated),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -24,7 +24,6 @@ async def create_user_service(db, user: UserCreate, current_user):
         raise ValueError("Username already taken")
 
     hashed_password = hash_password(user.password)
-
     return create_user(db, user, hashed_password, current_user)
 
 
@@ -49,7 +48,10 @@ async def update_user_service(db, user_id: str, user, current_user):
 
 
 async def get_user_service(db, user_id: str):
-    return get_user_by_id(db, user_id)
+    user = get_user_by_id(db, user_id)
+    if not user:
+        raise ValueError("User not found")
+    return user
 
 
 async def get_users_list_service(db, page: int, page_size: int, filters):
@@ -61,7 +63,7 @@ async def get_users_list_service(db, page: int, page_size: int, filters):
     role = filters.get("role")
 
     users = get_users(db, skip, limit, is_active, is_verified, role)
-    total = get_users_count(db)
+    total = get_users_count(db, is_active=is_active, is_verified=is_verified, role=role)
 
     return {"users": users, "total": total, "page": page, "page_size": page_size}
 

@@ -40,3 +40,7 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local dev / review notes — not for public repo
+CODE_REVIEW.md
+fastapi-boilerplate-guide.md

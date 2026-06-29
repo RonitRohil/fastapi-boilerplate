@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, APIRouter, Request, Response
+from fastapi import Cookie, Depends, HTTPException, APIRouter, Request, Response
 from app.services.auth_service import (
     forgot_password_service,
     login_user,
@@ -7,23 +7,57 @@ from app.services.auth_service import (
     signup_user,
     reset_password,
 )
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, verify_csrf_token
 from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
-    LogoutRequest,
-    RefreshTokenRequest,
     SignupRequest,
     ResetPasswordRequest,
 )
 from app.schemas.user import UserResponse
 from app.core.response import api_response
 from app.core.config import settings
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Refresh token cookie path — covers both /refresh and /logout
+_REFRESH_COOKIE_PATH = "/api/v1/auth"
 
-@router.post("/signup")
+
+def _set_auth_cookies(
+    response: Response, access_token: str, refresh_token: str, csrf_token: str
+):
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="strict",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path=_REFRESH_COOKIE_PATH,
+    )
+    response.set_cookie(
+        key="csrf_token",
+        value=csrf_token,
+        httponly=False,  # JS reads this and attaches it as X-CSRF-Token header
+        secure=settings.COOKIE_SECURE,
+        samesite="strict",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+@router.post("/signup", status_code=201)
+@limiter.limit("10/minute")
 async def signup(
     sign_up_request: SignupRequest,
     request: Request,
@@ -32,43 +66,18 @@ async def signup(
 ):
     try:
         result = await signup_user(db, sign_up_request, request)
-
-        response.set_cookie(
-            key="access_token",
-            value=result["access_token"],
-            httponly=True,  # JS cannot read this
-            secure=settings.COOKIE_SECURE,  # HTTPS only (set False locally for dev)
-            samesite="lax",  # sent on same-site + top-level cross-site navs
-            max_age=1800,  # 30 minutes (matches ACCESS_TOKEN_EXPIRE_MINUTES)
-            path="/",
-        )
-
-        # refresh token — restrict path so it's only sent to the refresh endpoint
-        response.set_cookie(
-            key="refresh_token",
-            value=result["refresh_token"],
-            httponly=True,
-            secure=settings.COOKIE_SECURE,
-            samesite="strict",
-            max_age=604800,  # 7 days
-            path="/api/v1/auth/refresh",  # only sent when hitting refresh endpoint
-        )
-
-        # CSRF token — NOT httpOnly — JS must be able to read this
-        response.set_cookie(
-            key="csrf_token",
-            value=result["csrf_token"],
-            httponly=False,  # JS reads this and attaches to headers
-            secure=settings.COOKIE_SECURE,
-            samesite="strict",
-            max_age=1800,
+        _set_auth_cookies(
+            response,
+            result["access_token"],
+            result["refresh_token"],
+            result["csrf_token"],
         )
 
         return api_response(
             success=1,
-            status_code=200,
+            status_code=201,
             message="User signed up successfully",
-            result=result,
+            result={"user": result["user"]},  # tokens stay in cookies only
         )
 
     except Exception as e:
@@ -76,6 +85,7 @@ async def signup(
 
 
 @router.post("/login")
+@limiter.limit("10/minute")
 async def login(
     login_request: LoginRequest,
     request: Request,
@@ -86,43 +96,18 @@ async def login(
         result = await login_user(
             db, login_request.email, login_request.password, request
         )
-
-        response.set_cookie(
-            key="access_token",
-            value=result["access_token"],
-            httponly=True,  # JS cannot read this
-            secure=settings.COOKIE_SECURE,  # HTTPS only (set False locally for dev)
-            samesite="lax",  # sent on same-site + top-level cross-site navs
-            max_age=1800,  # 30 minutes (matches ACCESS_TOKEN_EXPIRE_MINUTES)
-            path="/",
-        )
-
-        # refresh token — restrict path so it's only sent to the refresh endpoint
-        response.set_cookie(
-            key="refresh_token",
-            value=result["refresh_token"],
-            httponly=True,
-            secure=settings.COOKIE_SECURE,
-            samesite="strict",
-            max_age=604800,  # 7 days
-            path="/api/v1/auth/refresh",  # only sent when hitting refresh endpoint
-        )
-
-        # CSRF token — NOT httpOnly — JS must be able to read this
-        response.set_cookie(
-            key="csrf_token",
-            value=result["csrf_token"],
-            httponly=False,  # JS reads this and attaches to headers
-            secure=settings.COOKIE_SECURE,
-            samesite="strict",
-            max_age=1800,
+        _set_auth_cookies(
+            response,
+            result["access_token"],
+            result["refresh_token"],
+            result["csrf_token"],
         )
 
         return api_response(
             success=1,
             status_code=200,
             message="User logged in successfully",
-            result=result,
+            result={"user": result["user"]},  # tokens stay in cookies only
         )
 
     except Exception as e:
@@ -130,34 +115,38 @@ async def login(
 
 
 @router.post("/refresh")
-async def refresh(request: RefreshTokenRequest, response: Response, db=Depends(get_db)):
+async def refresh(
+    response: Response,
+    db=Depends(get_db),
+    refresh_token: str | None = Cookie(default=None),
+):
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token missing")
     try:
-        result = await refresh_user_session(db, request.refresh_token)
+        result = await refresh_user_session(db, refresh_token)
         response.set_cookie(
             key="access_token",
             value=result["access_token"],
-            httponly=True,  # JS cannot read this
-            secure=settings.COOKIE_SECURE,  # HTTPS only (set False locally for dev)
-            samesite="lax",  # sent on same-site + top-level cross-site navs
-            max_age=1800,  # 30 minutes (matches ACCESS_TOKEN_EXPIRE_MINUTES)
+            httponly=True,
+            secure=settings.COOKIE_SECURE,
+            samesite="lax",
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             path="/",
         )
-
-        # CSRF token — NOT httpOnly — JS must be able to read this
         response.set_cookie(
             key="csrf_token",
             value=result["csrf_token"],
-            httponly=False,  # JS reads this and attaches to headers
+            httponly=False,
             secure=settings.COOKIE_SECURE,
             samesite="strict",
-            max_age=1800,
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
 
         return api_response(
             success=1,
             status_code=200,
-            message="User token refreshed successfully",
-            result=result,
+            message="Token refreshed successfully",
+            result=None,
         )
 
     except Exception as e:
@@ -165,34 +154,45 @@ async def refresh(request: RefreshTokenRequest, response: Response, db=Depends(g
 
 
 @router.post("/logout")
-async def logout(request: LogoutRequest, response: Response, db=Depends(get_db)):
+async def logout(
+    response: Response,
+    db=Depends(get_db),
+    refresh_token: str | None = Cookie(default=None),
+    _=Depends(verify_csrf_token),
+):
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token missing")
     try:
-        user = await logout_user(db, request.refresh_token)
+        result = await logout_user(db, refresh_token)
 
         response.delete_cookie(key="access_token", path="/")
-        response.delete_cookie(key="refresh_token", path="/api/v1/auth/refresh")
+        response.delete_cookie(key="refresh_token", path=_REFRESH_COOKIE_PATH)
         response.delete_cookie(key="csrf_token", path="/")
 
         return api_response(
             success=1,
             status_code=200,
             message="User logged out successfully",
-            result=user,
+            result=result,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/forgot/password")
-async def forgot_password_router(request: ForgotPasswordRequest, db=Depends(get_db)):
+@limiter.limit("5/minute")
+async def forgot_password_router(
+    request: Request,
+    body: ForgotPasswordRequest,
+    db=Depends(get_db),
+):
     try:
-        forgot_password_result = await forgot_password_service(db, request.email)
-
+        result = await forgot_password_service(db, body.email)
         return api_response(
             success=1,
             status_code=200,
             message="Password reset link sent successfully",
-            result=forgot_password_result,
+            result=result,
         )
 
     except Exception as e:

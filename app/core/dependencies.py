@@ -1,6 +1,6 @@
 from app.core.database import SessionLocal
 from fastapi import Depends, HTTPException, Cookie, Header
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.repositories import user_repository
@@ -14,17 +14,21 @@ def get_db():
         db.close()
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+http_bearer = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
     access_token: str | None = Cookie(default=None),
     authorization: str | None = Header(default=None),
+    bearer_credentials: HTTPAuthorizationCredentials | None = Depends(http_bearer),
     db=Depends(get_db),
 ):
+    # Priority: cookie (web) > bearer from Swagger UI > raw Authorization header
     token = None
     if access_token:
         token = access_token
+    elif bearer_credentials:
+        token = bearer_credentials.credentials  # already stripped of "Bearer " prefix
     elif authorization and authorization.startswith("Bearer "):
         token = authorization[7:]
 

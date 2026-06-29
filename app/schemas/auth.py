@@ -1,22 +1,26 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr
 
 
 class UserSessionCreate(BaseModel):
     user_id: str
     session_id: str
-    refresh_token: str | None = None
-    csrf_token: str | None = None
+    expires_at: datetime
+    device_name: str | None = None
+    user_agent: str | None = None
+    ip_address: str | None = None
 
 
 class UserSessionResponse(BaseModel):
     id: int
     user_id: str
     session_id: str
-    refresh_token: str | None = None
-    csrf_token: str | None = None
-    expires_at: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    device_name: str | None = None
+    user_agent: str | None = None
+    ip_address: str | None = None
+    revoked_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 class LoginRequest(BaseModel):
@@ -75,7 +79,7 @@ class AddUserToken(BaseModel):
     user_id: str
     session_id: str
     token_type: str
-    expires_at: str
+    expires_at: datetime
 
 
 class AddUserTokenResponse(BaseModel):
@@ -83,5 +87,5 @@ class AddUserTokenResponse(BaseModel):
     user_id: str
     session_id: str
     token_type: str
-    expires_at: str
-    revoked_at: str
+    expires_at: datetime
+    revoked_at: datetime

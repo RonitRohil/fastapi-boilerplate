@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, APIRouter
+from fastapi import Depends, HTTPException, APIRouter, Request
 from app.services.auth_service import (
     forgot_password_service,
     login_user,
@@ -11,6 +11,7 @@ from app.core.dependencies import get_db
 from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
+    LogoutRequest,
     RefreshTokenRequest,
     SignupRequest,
     ResetPasswordRequest,
@@ -21,9 +22,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/signup")
-async def signup(sign_up_request: SignupRequest, db=Depends(get_db)):
+async def signup(sign_up_request: SignupRequest, request: Request, db=Depends(get_db)):
     try:
-        user = await signup_user(db, sign_up_request, sign_up_request)
+        user = await signup_user(db, sign_up_request, request)
 
         return api_response(
             success=1,
@@ -37,10 +38,10 @@ async def signup(sign_up_request: SignupRequest, db=Depends(get_db)):
 
 
 @router.post("/login")
-async def login(login_request=LoginRequest, db=Depends(get_db)):
+async def login(login_request: LoginRequest, request: Request, db=Depends(get_db)):
     try:
         user = await login_user(
-            db, login_request.email, login_request.password, login_request
+            db, login_request.email, login_request.password, request
         )
         return api_response(
             success=1,
@@ -48,6 +49,7 @@ async def login(login_request=LoginRequest, db=Depends(get_db)):
             message="User logged in successfully",
             result=user,
         )
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -68,9 +70,9 @@ async def refresh(request: RefreshTokenRequest, db=Depends(get_db)):
 
 
 @router.post("/logout")
-async def logout(user_id: str, db=Depends(get_db)):
+async def logout(request: LogoutRequest, db=Depends(get_db)):
     try:
-        user = await logout_user(db, user_id)
+        user = await logout_user(db, request.refresh_token)
         return api_response(
             success=1,
             status_code=200,
@@ -98,7 +100,7 @@ async def forgot_password_router(request: ForgotPasswordRequest, db=Depends(get_
 
 
 @router.post("/reset/password")
-async def reset_password_router(request=ResetPasswordRequest, db=Depends(get_db)):
+async def reset_password_router(request: ResetPasswordRequest, db=Depends(get_db)):
     try:
         user = await reset_password(db, request.token, request.new_password)
         return api_response(

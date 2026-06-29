@@ -47,7 +47,9 @@ def create_refresh_token(user: dict) -> str:
 
 def decode_access_token(token: str) -> dict:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=settings.ALGORITHM)
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         return payload
     except jwt.ExpiredSignatureError:
         raise ValueError("Token has expired")
@@ -68,7 +70,9 @@ def create_csrf_token(user: dict) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
     }
 
-    csrf_token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    csrf_token = jwt.encode(
+        payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
     return csrf_token
 
 

@@ -30,7 +30,7 @@ async def create_user_route(
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
-        return {"error": "An unexpected error occurred: " + str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/update/{user_id}", response_model=UserResponse)
@@ -46,7 +46,7 @@ async def update_user_route(
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
-        return {"error": "An unexpected error occurred: " + str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/get/{user_id}", response_model=UserResponse)
@@ -63,13 +63,15 @@ async def get_user_by_id_route(db=Depends(get_db), user_id: str = None):
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
-        return {"error": "An unexpected error occurred: " + str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/get/list", response_model=UserListResponse)
-async def get_users_list_route(db, page: int = 1, page_size: int = 10):
+async def get_users_list_route(
+    db, page: int = 1, page_size: int = 10, filters: dict = {}
+):
     try:
-        users_list = await get_users_list_service(db, page, page_size)
+        users_list = await get_users_list_service(db, page, page_size, filters)
         return api_response(
             success=1,
             status_code=200,
@@ -80,13 +82,13 @@ async def get_users_list_route(db, page: int = 1, page_size: int = 10):
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
-        return {"error": "An unexpected error occurred: " + str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/delete/{user_id}", response_model=UserResponse)
-async def delete_user_route(db, user_id: str):
+async def delete_user_route(db, user_id: str, current_user=Depends(get_current_user)):
     try:
-        delete_user = await delete_user_service(db, user_id)
+        delete_user = await delete_user_service(db, user_id, current_user)
         return api_response(
             success=1,
             status_code=200,
@@ -98,9 +100,11 @@ async def delete_user_route(db, user_id: str):
 
 
 @router.put("/{user_id}/update/status", response_model=UserResponse, status_code=200)
-async def user_update_status_route(db, user_id: str):
+async def user_update_status_route(
+    db, user_id: str, current_user=Depends(get_current_user)
+):
     try:
-        update_user_status = await update_user_status_service(db, user_id)
+        update_user_status = await update_user_status_service(db, user_id, current_user)
 
         return api_response(
             success=1,

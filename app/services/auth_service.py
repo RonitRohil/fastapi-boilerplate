@@ -30,25 +30,24 @@ from app.repositories.auth_repository import (
     revoke_user_session_no_commit,
     revoke_user_token_no_commit,
 )
-from app.schemas.auth import UserSessionCreate
+from app.schemas.auth import AddUserToken, UserSessionCreate
 
 
 async def signup_user(db, user: UserCreate, request):
     # Validate email uniqueness
-    existing_user = await get_user_by_email(db, user.email)
+    existing_user = get_user_by_email(db, user.email)
     if existing_user:
         raise ValueError("Email already registered")
 
     # Validate username uniqueness
-    existing_user = await get_user_by_username(db, user.username)
+    existing_user = get_user_by_username(db, user.username)
     if existing_user:
         raise ValueError("Username already taken")
 
     try:
         hashed_password = hash_password(user.password)
-        user.password = hashed_password
 
-        db_user = create_user_no_commit(db, user)
+        db_user = create_user_no_commit(db, user, hashed_password)
         db.flush()
 
         session_id = str(uuid.uuid4())
@@ -73,31 +72,29 @@ async def signup_user(db, user: UserCreate, request):
 
         db_session = create_user_session_no_commit(
             db,
-            {
-                "user_id": db_user.id,
-                "session_id": session_id,
-                "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
-                "user_agent": request.headers.get("User-Agent"),
-                "ip_address": request.client.host,
-                "device_name": request.headers.get("Device-Name"),
-            },
+            UserSessionCreate(
+                user_id=str(db_user.id),
+                session_id=session_id,
+                expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+                user_agent=request.headers.get("User-Agent"),
+                ip_address=request.client.host,
+                device_name=request.headers.get("Device-Name"),
+            ),
         )
 
         db_token = add_user_token_no_commit(
             db,
-            {
-                "user_id": db_user.id,
-                "session_id": session_id,
-                "jti": jti,
-                "token_type": "refresh",
-                "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
-            },
+            AddUserToken(
+                jti=jti,
+                user_id=str(db_user.id),
+                session_id=session_id,
+                token_type="refresh",
+                expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+            ),
         )
 
         db.commit()
         db.refresh(db_user)
-        db.refresh(db_session)
-        db.refresh(db_token)
 
         return {
             "access_token": access_token,
@@ -116,7 +113,7 @@ async def login_user(db, email: str, password: str, request):
     if not user:
         raise ValueError("Invalid email or password")
 
-    password_verification = await verify_password(password, user.hashed_password)
+    password_verification = verify_password(password, user.hashed_password)
     if not password_verification:
         raise ValueError("Invalid email or password")
 
@@ -124,7 +121,7 @@ async def login_user(db, email: str, password: str, request):
         session_id = str(uuid.uuid4())
 
         user_dict = {
-            "id": user.id,
+            "id": str(user.id),
             "username": user.username,
             "email": user.email,
             "first_name": user.first_name,
@@ -144,30 +141,28 @@ async def login_user(db, email: str, password: str, request):
 
         db_session = create_user_session_no_commit(
             db,
-            {
-                "user_id": user.id,
-                "session_id": session_id,
-                "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
-                "user_agent": request.headers.get("User-Agent"),
-                "ip_address": request.client.host,
-                "device_name": request.headers.get("Device-Name"),
-            },
+            UserSessionCreate(
+                user_id=str(user.id),
+                session_id=session_id,
+                expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+                user_agent=request.headers.get("User-Agent"),
+                ip_address=request.client.host,
+                device_name=request.headers.get("Device-Name"),
+            ),
         )
 
         db_token = add_user_token_no_commit(
             db,
-            {
-                "user_id": user.id,
-                "session_id": session_id,
-                "jti": jti,
-                "token_type": "refresh",
-                "expires_at": datetime.now(timezone.utc) + timedelta(days=7),
-            },
+            AddUserToken(
+                jti=jti,
+                user_id=str(user.id),
+                session_id=session_id,
+                token_type="refresh",
+                expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+            ),
         )
 
         db.commit()
-        db.refresh(db_session)
-        db.refresh(db_token)
 
         return {
             "access_token": access_token,
@@ -191,7 +186,7 @@ async def refresh_user_session(db, refresh_token: str):
         raise ValueError("Invalid refresh token")
 
     session_id = payload.get("session_id")
-    user_id = payload.get("user_id")
+    user_id = payload.get("sub")
 
     session = get_user_session(db, session_id)
 
@@ -229,20 +224,30 @@ async def refresh_user_session(db, refresh_token: str):
     return {"access_token": new_access_token, "csrf_token": new_csrf_token}
 
 
-async def logout_user(db, user_id: str):
+async def logout_user(db, refresh_token: str):
     # Logic to logout the user
-    user = get_user_by_id(db, user_id)
+    try:
+        payload = decode_access_token(refresh_token)
+    except ValueError as e:
+        raise ValueError("Invalid or expired access token")
 
-    if not user:
-        raise ValueError("User not found")
+    if payload.get("type") != "refresh":
+        raise ValueError("Not a refresh token")
 
-    revoke_session = await revoke_user_session_no_commit(db, user_id)
+    session_id = payload.get("session_id")
+    jti = payload.get("jti")
+    user_id = payload.get("sub")
 
-    revoke_token = await revoke_user_token_no_commit(db, user_id)
+    revoke_session = revoke_user_session_no_commit(db, session_id)
+    revoke_token = revoke_user_token_no_commit(db, jti)
 
     db.commit()
-    db.refresh(revoke_session)
-    db.refresh(revoke_token)
+
+    if revoke_session:
+        db.refresh(revoke_session)
+
+    if revoke_token:
+        db.refresh(revoke_token)
 
     return {"message": "User logged out successfully"}
 
@@ -250,14 +255,13 @@ async def logout_user(db, user_id: str):
 async def forgot_password_service(db, email: str):
     user = get_user_by_email(db, email)
 
-    if not user:
-        raise ValueError("User with email not found.")
-
-    reset_token = create_password_reset_token(user.id)
+    if user:
+        reset_token = create_password_reset_token(user.id)
+        return reset_token
 
     # For production send email
 
-    return reset_token
+    return
 
 
 async def reset_password(db, token: str, new_password: str):
@@ -280,9 +284,9 @@ async def reset_password(db, token: str, new_password: str):
     user.hashed_password = hashed_password
 
     # Revoke all sessions
-    user_sessions = await revoke_all_user_sessions_no_commit(db, user_id)
+    user_sessions = revoke_all_user_sessions_no_commit(db, user_id)
 
-    user_tokens = await revoke_all_user_tokens_no_commit(db, user_id)
+    user_tokens = revoke_all_user_tokens_no_commit(db, user_id)
 
     db.commit()
     db.refresh(user)

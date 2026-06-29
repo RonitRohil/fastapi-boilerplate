@@ -8,7 +8,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
 )
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.database import Base
 import uuid
 from sqlalchemy.orm import relationship
@@ -26,10 +26,16 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     role = Column(Enum("user", "admin", name="user_roles"), default="user")
     is_verified = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    created_by = Column(UUID, ForeignKey("users.id"), nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    updated_by = Column(UUID, ForeignKey("users.id"), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     sessions = relationship(
         "UserSession", back_populates="user", foreign_keys="UserSession.user_id"

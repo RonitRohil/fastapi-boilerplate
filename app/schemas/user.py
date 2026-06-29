@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class UserCreate(BaseModel):
@@ -17,6 +17,7 @@ class UserUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     username: str | None = None
+    email: EmailStr | None = None
     is_active: bool | None = None
     is_verified: bool | None = None
     role: str | None = None
@@ -29,6 +30,7 @@ class UserSelfUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     username: str
     email: EmailStr

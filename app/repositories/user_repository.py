@@ -62,7 +62,7 @@ def create_user_no_commit(db, user: UserCreate, hashed_password: str) -> User:
 def update_user(db, user_id: str, user: UserUpdate, current_user):
     db_user = get_user_by_id(db, user_id)
     if db_user:
-        for key, value in user.dict(exclude_unset=True).items():
+        for key, value in user.model_dump(exclude_unset=True).items():
             setattr(db_user, key, value)
 
         db_user.updated_by = current_user.id
@@ -101,9 +101,9 @@ def activate_user(db, user_id: str, current_user):
 def delete_user(db, user_id: str, current_user):
     db_user = get_user_by_id(db, user_id)
     if db_user:
-        db.delete(db_user)
         db_user.updated_by = current_user.id
         db_user.updated_at = datetime.now(timezone.utc)
+        db.delete(db_user)
 
         db.commit()
         return db_user

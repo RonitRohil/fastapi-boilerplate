@@ -14,18 +14,13 @@ def hash_password(password: str) -> str:
 def create_access_token(user: dict) -> str:
     payload = {
         "sub": user["id"],
-        "user_details": {
-            "user_id": user["id"],
-            "username": user["username"],
-            "email": user["email"],
-            "first_name": user["first_name"],
-            "last_name": user["last_name"],
-            "role": user["role"],
-            "is_active": user["is_active"],
-            "is_verified": user["is_verified"],
-        },
+        "role": user["role"],
+        "is_active": user["is_active"],
+        "session_id": user["session_id"],
         "exp": datetime.now(timezone.utc)
         + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "iat": datetime.now(timezone.utc),
+        "type": "access_token",
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return token
@@ -70,9 +65,7 @@ def create_csrf_token(user: dict) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
     }
 
-    csrf_token = jwt.encode(
-        payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-    )
+    csrf_token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return csrf_token
 
 

@@ -109,7 +109,7 @@ async def signup_user(db, user: UserCreate, request):
 
 
 async def login_user(db, email: str, password: str, request):
-    user = db.query(User).filter(User.email == email).first()
+    user = get_user_by_email(db, email)
     if not user:
         raise ValueError("Invalid email or password")
 
@@ -200,7 +200,10 @@ async def refresh_user_session(db, refresh_token: str):
 
     token_record = get_user_token_with_jti(db, jti)
 
-    if not token_record and token_record.revoked_at is not None:
+    if not token_record:
+        raise ValueError("Refresh token not found")
+
+    if token_record.revoked_at is not None:
         raise ValueError("Refresh token has been revoked")
 
     user = get_user_by_id(db, user_id)
@@ -208,7 +211,7 @@ async def refresh_user_session(db, refresh_token: str):
         raise ValueError("User not found or inactive")
 
     user_dict = {
-        "id": user.id,
+        "id": str(user.id),
         "username": user.username,
         "email": user.email,
         "first_name": user.first_name,
@@ -216,6 +219,7 @@ async def refresh_user_session(db, refresh_token: str):
         "is_active": user.is_active,
         "is_verified": user.is_verified,
         "role": user.role,
+        "session_id": session_id,
     }
 
     new_access_token = create_access_token(user_dict)
@@ -257,11 +261,12 @@ async def forgot_password_service(db, email: str):
 
     if user:
         reset_token = create_password_reset_token(user.id)
-        return reset_token
+        print(reset_token)
+        # send email
 
     # For production send email
 
-    return
+    return {"message": "If that email is registered, a reset link has been sent"}
 
 
 async def reset_password(db, token: str, new_password: str):
@@ -290,7 +295,5 @@ async def reset_password(db, token: str, new_password: str):
 
     db.commit()
     db.refresh(user)
-    db.refresh(user_sessions)
-    db.refresh(user_tokens)
 
     return user

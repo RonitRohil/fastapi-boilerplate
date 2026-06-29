@@ -1,6 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.core.dependencies import get_db, get_current_user
-from app.schemas.user import UserResponse, UserCreate, UserUpdate, UserListResponse
+from app.core.dependencies import get_db, get_current_user, require_admin
+from app.schemas.user import (
+    UserResponse,
+    UserCreate,
+    UserSelfUpdate,
+    UserUpdate,
+    UserListResponse,
+)
 from app.services.user_service import (
     create_user_service,
     update_user_service,
@@ -33,15 +39,80 @@ async def create_user_route(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.put("/update/me", response_model=UserResponse)
+async def update_user_self(
+    user: UserSelfUpdate,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    try:
+        update_user_response = await update_user_service(
+            db, current_user, user, current_user
+        )
+
+        return api_response(
+            success=1,
+            status_code=200,
+            message="User updated successfully",
+            result=update_user_response,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/update/{user_id}", response_model=UserResponse)
 async def update_user_route(
     user: UserUpdate,
     user_id: str,
     db=Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
 ):
     try:
-        return await update_user_service(db, user_id, user, current_user)
+        update_user_response = await update_user_service(
+            db, user_id, user, current_user
+        )
+
+        return api_response(
+            success=1,
+            status_code=200,
+            message="User updated successfully",
+            result=update_user_response,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/get/list", response_model=UserListResponse)
+async def get_users_list_route(
+    db=Depends(get_db),
+    page: int = 1,
+    page_size: int = 10,
+    role: str | None = None,
+    is_active: bool | None = None,
+    is_verified: bool | None = None,
+):
+    try:
+        filters = {
+            "role": role,
+            "is_active": is_active,
+            "is_verified": is_verified,
+        }
+
+        users_list = await get_users_list_service(db, page, page_size, filters)
+
+        return api_response(
+            success=1,
+            status_code=200,
+            message="Users fetched successfully",
+            result=users_list,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -66,27 +137,10 @@ async def get_user_by_id_route(db=Depends(get_db), user_id: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/get/list", response_model=UserListResponse)
-async def get_users_list_route(
-    db, page: int = 1, page_size: int = 10, filters: dict = {}
-):
-    try:
-        users_list = await get_users_list_service(db, page, page_size, filters)
-        return api_response(
-            success=1,
-            status_code=200,
-            message="Users fetched successfully",
-            result=users_list,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.delete("/delete/{user_id}", response_model=UserResponse)
-async def delete_user_route(db, user_id: str, current_user=Depends(get_current_user)):
+async def delete_user_route(
+    user_id: str, db=Depends(get_db), current_user=Depends(require_admin)
+):
     try:
         delete_user = await delete_user_service(db, user_id, current_user)
         return api_response(
@@ -101,8 +155,9 @@ async def delete_user_route(db, user_id: str, current_user=Depends(get_current_u
 
 @router.put("/{user_id}/update/status", response_model=UserResponse, status_code=200)
 async def user_update_status_route(
-    db, user_id: str, current_user=Depends(get_current_user)
+    user_id: str, db=Depends(get_db), current_user=Depends(require_admin)
 ):
+
     try:
         update_user_status = await update_user_status_service(db, user_id, current_user)
 

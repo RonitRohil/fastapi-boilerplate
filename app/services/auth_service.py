@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 
-from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse
 from app.core.security import (
     create_password_reset_token,
@@ -23,10 +22,8 @@ from app.repositories.auth_repository import (
     create_user_session_no_commit,
     get_user_session,
     get_user_token_with_jti,
-    revoke_all_user_sessions,
     revoke_all_user_sessions_no_commit,
     revoke_all_user_tokens_no_commit,
-    revoke_user_session,
     revoke_user_session_no_commit,
     revoke_user_token_no_commit,
 )
@@ -70,7 +67,7 @@ async def signup_user(db, user: UserCreate, request):
         refresh_payload = decode_access_token(refresh_token)
         jti = refresh_payload.get("jti")
 
-        db_session = create_user_session_no_commit(
+        create_user_session_no_commit(
             db,
             UserSessionCreate(
                 user_id=str(db_user.id),
@@ -82,7 +79,7 @@ async def signup_user(db, user: UserCreate, request):
             ),
         )
 
-        db_token = add_user_token_no_commit(
+        add_user_token_no_commit(
             db,
             AddUserToken(
                 jti=jti,
@@ -140,7 +137,7 @@ async def login_user(db, email: str, password: str, request):
         refresh_payload = decode_access_token(refresh_token)
         jti = refresh_payload.get("jti")
 
-        db_session = create_user_session_no_commit(
+        create_user_session_no_commit(
             db,
             UserSessionCreate(
                 user_id=str(user.id),
@@ -152,7 +149,7 @@ async def login_user(db, email: str, password: str, request):
             ),
         )
 
-        db_token = add_user_token_no_commit(
+        add_user_token_no_commit(
             db,
             AddUserToken(
                 jti=jti,
@@ -181,7 +178,7 @@ async def login_user(db, email: str, password: str, request):
 async def refresh_user_session(db, refresh_token: str):
     try:
         payload = decode_access_token(refresh_token)
-    except ValueError as e:
+    except ValueError:
         raise ValueError("Invalid or expired refresh token")
 
     if payload.get("type") != "refresh":
@@ -234,7 +231,7 @@ async def logout_user(db, refresh_token: str):
     # Logic to logout the user
     try:
         payload = decode_access_token(refresh_token)
-    except ValueError as e:
+    except ValueError:
         raise ValueError("Invalid or expired access token")
 
     if payload.get("type") != "refresh":
@@ -242,7 +239,6 @@ async def logout_user(db, refresh_token: str):
 
     session_id = payload.get("session_id")
     jti = payload.get("jti")
-    user_id = payload.get("sub")
 
     revoke_session = revoke_user_session_no_commit(db, session_id)
     revoke_token = revoke_user_token_no_commit(db, jti)
@@ -275,7 +271,7 @@ async def reset_password(db, token: str, new_password: str):
     # Logic to reset the user password
     try:
         payload = decode_access_token(token)
-    except ValueError as e:
+    except ValueError:
         raise ValueError("Resent link is invalid or expired")
 
     if payload.get("purpose") != "password_reset":
@@ -291,9 +287,8 @@ async def reset_password(db, token: str, new_password: str):
     user.hashed_password = hashed_password
 
     # Revoke all sessions
-    user_sessions = revoke_all_user_sessions_no_commit(db, user_id)
-
-    user_tokens = revoke_all_user_tokens_no_commit(db, user_id)
+    revoke_all_user_sessions_no_commit(db, user_id)
+    revoke_all_user_tokens_no_commit(db, user_id)
 
     db.commit()
     db.refresh(user)

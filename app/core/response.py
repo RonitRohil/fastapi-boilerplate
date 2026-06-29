@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from app.schemas.response import APIResponse

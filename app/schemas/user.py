@@ -31,7 +31,7 @@ class UserSelfUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: UUID           # UUID(as_uuid=True) in ORM → must be UUID, not str
+    id: UUID  # UUID(as_uuid=True) in ORM → must be UUID, not str
     username: str
     email: EmailStr
     first_name: str | None = None
@@ -41,7 +41,7 @@ class UserResponse(BaseModel):
     role: str
     created_at: datetime
     updated_at: datetime
-    created_by: UUID | None = None   # FK to users.id — UUID(as_uuid=True)
+    created_by: UUID | None = None  # FK to users.id — UUID(as_uuid=True)
     updated_by: UUID | None = None
 
 

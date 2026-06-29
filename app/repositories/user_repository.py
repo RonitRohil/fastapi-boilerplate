@@ -2,13 +2,7 @@ from datetime import datetime, timezone
 
 from app.core.security import hash_password
 from app.models.user import User
-from app.schemas.user import (
-    UserCreate,
-    UserUpdate,
-    UserSelfUpdate,
-    UserResponse,
-    UserListResponse,
-)
+from app.schemas.user import UserCreate
 
 
 def get_user_by_id(db, user_id: str):

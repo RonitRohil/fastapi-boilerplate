@@ -1,7 +1,6 @@
 from sqlalchemy import (
     Column,
     DateTime,
-    Integer,
     String,
     Boolean,
     UUID,

@@ -1,6 +1,5 @@
-from app.models.user import User
 from app.models.auth import UserSession, UserToken
-from app.schemas.auth import UserSessionCreate, UserSessionResponse, AddUserToken
+from app.schemas.auth import UserSessionCreate, AddUserToken
 from datetime import datetime, timezone
 
 

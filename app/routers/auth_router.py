@@ -1,4 +1,5 @@
-from fastapi import Cookie, Depends, HTTPException, APIRouter, Request, Response
+from fastapi import Cookie, Depends, HTTPException, APIRouter, Request
+from fastapi.responses import JSONResponse
 from app.services.auth_service import (
     forgot_password_service,
     login_user,
@@ -26,8 +27,8 @@ _REFRESH_COOKIE_PATH = "/api/v1/auth"
 
 
 def _set_auth_cookies(
-    response: Response, access_token: str, refresh_token: str, csrf_token: str
-):
+    response: JSONResponse, access_token: str, refresh_token: str, csrf_token: str
+) -> None:
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -61,24 +62,23 @@ def _set_auth_cookies(
 async def signup(
     sign_up_request: SignupRequest,
     request: Request,
-    response: Response,
     db=Depends(get_db),
 ):
     try:
         result = await signup_user(db, sign_up_request, request)
-        _set_auth_cookies(
-            response,
-            result["access_token"],
-            result["refresh_token"],
-            result["csrf_token"],
-        )
-
-        return api_response(
+        resp = api_response(
             success=1,
             status_code=201,
             message="User signed up successfully",
             result={"user": result["user"]},  # tokens stay in cookies only
         )
+        _set_auth_cookies(
+            resp,
+            result["access_token"],
+            result["refresh_token"],
+            result["csrf_token"],
+        )
+        return resp
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -89,26 +89,25 @@ async def signup(
 async def login(
     login_request: LoginRequest,
     request: Request,
-    response: Response,
     db=Depends(get_db),
 ):
     try:
         result = await login_user(
             db, login_request.email, login_request.password, request
         )
-        _set_auth_cookies(
-            response,
-            result["access_token"],
-            result["refresh_token"],
-            result["csrf_token"],
-        )
-
-        return api_response(
+        resp = api_response(
             success=1,
             status_code=200,
             message="User logged in successfully",
             result={"user": result["user"]},  # tokens stay in cookies only
         )
+        _set_auth_cookies(
+            resp,
+            result["access_token"],
+            result["refresh_token"],
+            result["csrf_token"],
+        )
+        return resp
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -116,7 +115,6 @@ async def login(
 
 @router.post("/refresh")
 async def refresh(
-    response: Response,
     db=Depends(get_db),
     refresh_token: str | None = Cookie(default=None),
 ):
@@ -124,7 +122,13 @@ async def refresh(
         raise HTTPException(status_code=401, detail="Refresh token missing")
     try:
         result = await refresh_user_session(db, refresh_token)
-        response.set_cookie(
+        resp = api_response(
+            success=1,
+            status_code=200,
+            message="Token refreshed successfully",
+            result=None,
+        )
+        resp.set_cookie(
             key="access_token",
             value=result["access_token"],
             httponly=True,
@@ -133,7 +137,7 @@ async def refresh(
             max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             path="/",
         )
-        response.set_cookie(
+        resp.set_cookie(
             key="csrf_token",
             value=result["csrf_token"],
             httponly=False,
@@ -141,13 +145,7 @@ async def refresh(
             samesite="strict",
             max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
-
-        return api_response(
-            success=1,
-            status_code=200,
-            message="Token refreshed successfully",
-            result=None,
-        )
+        return resp
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -155,7 +153,6 @@ async def refresh(
 
 @router.post("/logout")
 async def logout(
-    response: Response,
     db=Depends(get_db),
     refresh_token: str | None = Cookie(default=None),
     _=Depends(verify_csrf_token),
@@ -164,17 +161,16 @@ async def logout(
         raise HTTPException(status_code=401, detail="Refresh token missing")
     try:
         result = await logout_user(db, refresh_token)
-
-        response.delete_cookie(key="access_token", path="/")
-        response.delete_cookie(key="refresh_token", path=_REFRESH_COOKIE_PATH)
-        response.delete_cookie(key="csrf_token", path="/")
-
-        return api_response(
+        resp = api_response(
             success=1,
             status_code=200,
             message="User logged out successfully",
             result=result,
         )
+        resp.delete_cookie(key="access_token", path="/")
+        resp.delete_cookie(key="refresh_token", path=_REFRESH_COOKIE_PATH)
+        resp.delete_cookie(key="csrf_token", path="/")
+        return resp
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -86,7 +86,7 @@ def test_login_wrong_password(client):
         },
     )
     assert resp.status_code == 400
-    assert "Invalid" in resp.json()["detail"]
+    assert "Invalid" in resp.json()["message"]
 
 
 def test_login_unknown_email(client):
@@ -99,7 +99,7 @@ def test_login_unknown_email(client):
     )
     assert resp.status_code == 400
     # Same error message — no email enumeration
-    assert "Invalid" in resp.json()["detail"]
+    assert "Invalid" in resp.json()["message"]
 
 
 # ---------------------------------------------------------------------------

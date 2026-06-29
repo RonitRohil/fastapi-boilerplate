@@ -1,3 +1,5 @@
+import uuid as _uuid
+
 from app.models.auth import UserSession, UserToken
 from app.schemas.auth import UserSessionCreate, AddUserToken
 from datetime import datetime, timezone
@@ -5,7 +7,7 @@ from datetime import datetime, timezone
 
 def create_user_session_no_commit(db, user_session: UserSessionCreate):
     db_user_session = UserSession(
-        user_id=user_session.user_id,
+        user_id=_uuid.UUID(user_session.user_id),
         session_id=user_session.session_id,
         device_name=user_session.device_name,
         user_agent=user_session.user_agent,
@@ -28,7 +30,11 @@ def revoke_user_session_no_commit(db, session_id: str):
 
 
 def revoke_all_user_sessions_no_commit(db, user_id: str):
-    user_sessions = db.query(UserSession).filter(UserSession.user_id == user_id).all()
+    user_sessions = (
+        db.query(UserSession)
+        .filter(UserSession.user_id == _uuid.UUID(str(user_id)))
+        .all()
+    )
     for user_session in user_sessions:
         user_session.revoked_at = datetime.now(timezone.utc)
     return user_sessions
@@ -37,7 +43,7 @@ def revoke_all_user_sessions_no_commit(db, user_id: str):
 def add_user_token_no_commit(db, user_token: AddUserToken):
     db_user_token = UserToken(
         jti=user_token.jti,
-        user_id=user_token.user_id,
+        user_id=_uuid.UUID(user_token.user_id),
         session_id=user_token.session_id,
         token_type=user_token.token_type,
         expires_at=user_token.expires_at,
@@ -51,7 +57,9 @@ def get_user_token_with_jti(db, jti: str):
 
 
 def revoke_all_user_tokens_no_commit(db, user_id: str):
-    user_tokens = db.query(UserToken).filter(UserToken.user_id == user_id).all()
+    user_tokens = (
+        db.query(UserToken).filter(UserToken.user_id == _uuid.UUID(str(user_id))).all()
+    )
     for user_token in user_tokens:
         user_token.revoked_at = datetime.now(timezone.utc)
     return user_tokens

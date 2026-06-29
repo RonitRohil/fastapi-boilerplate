@@ -100,7 +100,8 @@ def test_create_user_as_non_admin_returns_403(registered_client, auth_headers):
     assert resp.status_code == 403
 
 
-def test_create_user_invalid_role_returns_422(registered_client, auth_headers):
+def test_create_user_invalid_role_returns_403(registered_client, auth_headers):
+    # require_admin runs before body parsing, so non-admin gets 403 first
     resp = registered_client.post(
         "/api/v1/users/create",
         json={
@@ -111,7 +112,7 @@ def test_create_user_invalid_role_returns_422(registered_client, auth_headers):
         },
         headers=auth_headers,
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------

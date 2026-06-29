@@ -1,3 +1,4 @@
+import uuid as _uuid
 from datetime import datetime, timezone
 
 from app.core.security import hash_password
@@ -6,7 +7,7 @@ from app.schemas.user import UserCreate
 
 
 def get_user_by_id(db, user_id: str):
-    return db.query(User).filter(User.id == user_id).first()
+    return db.query(User).filter(User.id == _uuid.UUID(str(user_id))).first()
 
 
 def get_user_by_username(db, username: str):

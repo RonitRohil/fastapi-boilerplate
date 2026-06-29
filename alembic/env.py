@@ -18,15 +18,14 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-import sys
-import os
+import sys  # noqa: E402
+import os  # noqa: E402
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from app.core.database import Base
-from app.models import user, auth  # import models so SQLAlchemy registers them
+from app.core.database import Base  # noqa: E402
 
-from app.core.config import settings
+from app.core.config import settings  # noqa: E402
 
 # Override the sqlalchemy.url from alembic.ini with your actual DATABASE_URL
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

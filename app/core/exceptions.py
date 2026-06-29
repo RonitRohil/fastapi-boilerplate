@@ -1,3 +1,5 @@
+import json
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -23,7 +25,13 @@ def _make_json_safe(obj):
         return {k: _make_json_safe(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_make_json_safe(i) for i in obj]
-    return obj
+    if isinstance(obj, Exception):
+        return str(obj)
+    try:
+        json.dumps(obj)
+        return obj
+    except (TypeError, ValueError):
+        return str(obj)
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):

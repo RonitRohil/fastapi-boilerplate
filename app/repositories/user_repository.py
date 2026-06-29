@@ -45,14 +45,14 @@ def create_user(db, user: UserCreate, hashed_password: str, current_user) -> Use
     return db_user
 
 
-def create_user_no_commit(db, user: UserCreate, hashed_password: str) -> User:
+def create_user_no_commit(db, user, hashed_password: str) -> User:
     db_user = User(
         username=user.username,
         email=user.email,
         hashed_password=hashed_password,
         first_name=user.first_name,
         last_name=user.last_name,
-        role=user.role,  # user created by admin can be admin also.
+        role="user",  # hardcoded — public signup cannot self-assign role
         is_active=True,
     )
 

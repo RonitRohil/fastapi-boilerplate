@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -30,7 +31,7 @@ class UserSelfUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: str
+    id: UUID           # UUID(as_uuid=True) in ORM → must be UUID, not str
     username: str
     email: EmailStr
     first_name: str | None = None
@@ -40,8 +41,8 @@ class UserResponse(BaseModel):
     role: str
     created_at: datetime
     updated_at: datetime
-    created_by: str | None = None
-    updated_by: str | None = None
+    created_by: UUID | None = None   # FK to users.id — UUID(as_uuid=True)
+    updated_by: UUID | None = None
 
 
 class UserListResponse(BaseModel):

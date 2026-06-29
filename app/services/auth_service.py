@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import uuid
 
 from app.models.user import User
-from app.schemas.user import UserCreate
+from app.schemas.user import UserCreate, UserResponse
 from app.core.security import (
     create_password_reset_token,
     hash_password,
@@ -100,7 +100,8 @@ async def signup_user(db, user: UserCreate, request):
             "access_token": access_token,
             "refresh_token": refresh_token,
             "csrf_token": csrf_token,
-            "user_details": db_user,
+            # Serialize to Pydantic before returning — raw ORM objects are not JSON serializable
+            "user": UserResponse.model_validate(db_user).model_dump(mode="json"),
         }
 
     except Exception as e:
@@ -168,7 +169,8 @@ async def login_user(db, email: str, password: str, request):
             "access_token": access_token,
             "refresh_token": refresh_token,
             "csrf_token": csrf_token,
-            "user_details": user,
+            # Serialize to Pydantic before returning — raw ORM objects are not JSON serializable
+            "user": UserResponse.model_validate(user).model_dump(mode="json"),
         }
 
     except Exception as e:

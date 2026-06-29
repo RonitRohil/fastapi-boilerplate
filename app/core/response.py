@@ -1,5 +1,6 @@
 from typing import Any, Optional
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from app.schemas.response import APIResponse
 
 
@@ -17,5 +18,5 @@ def api_response(
     )
     return JSONResponse(
         status_code=status_code,
-        content=body.model_dump(),
+        content=jsonable_encoder(body),
     )

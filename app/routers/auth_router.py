@@ -16,6 +16,7 @@ from app.schemas.auth import (
     SignupRequest,
     ResetPasswordRequest,
 )
+from app.schemas.user import UserResponse
 from app.core.response import api_response
 from app.core.config import settings
 
@@ -206,7 +207,7 @@ async def reset_password_router(request: ResetPasswordRequest, db=Depends(get_db
             success=1,
             status_code=200,
             message="Password reset successfully",
-            result=user,
+            result=UserResponse.model_validate(user).model_dump(mode="json"),
         )
 
     except Exception as e:
